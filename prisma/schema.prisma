@@ -1,0 +1,178 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+enum Role {
+  ADMIN
+  USER
+}
+
+enum AttendanceStatus {
+  PRESENT
+  ABSENT
+  PENDING
+}
+
+enum HabitStatus {
+  TICK
+  CROSS
+  PENDING
+}
+
+enum NotificationType {
+  HABIT_PENDING
+  ATTENDANCE_PENDING
+  ADMIN_MESSAGE
+}
+
+model User {
+  id             String              @id @default(cuid())
+  name           String
+  email          String              @unique
+  role           Role                @default(USER)
+  passwordHash   String?
+  image          String?
+  habits         HabitAssignment[]
+  habitLogs      HabitLog[]
+  attendance     Attendance[]
+  notifications  Notification[]
+  activityLogs   ActivityLog[]
+  reminderConfig ReminderConfig?
+  createdHabits  Habit[]
+  accounts       Account[]
+  sessions       Session[]
+  createdAt      DateTime            @default(now())
+  updatedAt      DateTime            @updatedAt
+}
+
+model Habit {
+  id           String            @id @default(cuid())
+  title        String
+  description  String?
+  month        Int
+  year         Int
+  createdById  String
+  createdBy    User              @relation(fields: [createdById], references: [id], onDelete: Cascade)
+  assignments  HabitAssignment[]
+  habitLogs    HabitLog[]
+  createdAt    DateTime          @default(now())
+  updatedAt    DateTime          @updatedAt
+}
+
+model HabitAssignment {
+  id        String   @id @default(cuid())
+  userId    String
+  habitId   String
+  active    Boolean  @default(true)
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  habit     Habit    @relation(fields: [habitId], references: [id], onDelete: Cascade)
+  createdAt DateTime @default(now())
+
+  @@unique([userId, habitId])
+}
+
+model HabitLog {
+  id        String      @id @default(cuid())
+  userId    String
+  habitId   String
+  date      DateTime
+  status    HabitStatus @default(PENDING)
+  note      String?
+  user      User        @relation(fields: [userId], references: [id], onDelete: Cascade)
+  habit     Habit       @relation(fields: [habitId], references: [id], onDelete: Cascade)
+  createdAt DateTime    @default(now())
+  updatedAt DateTime    @updatedAt
+
+  @@unique([userId, habitId, date])
+}
+
+model AttendanceRequiredDate {
+  id          String       @id @default(cuid())
+  date        DateTime     @unique
+  title       String
+  description String?
+  attendance  Attendance[]
+  createdAt   DateTime     @default(now())
+}
+
+model Attendance {
+  id               String           @id @default(cuid())
+  userId           String
+  requiredDateId   String
+  status           AttendanceStatus @default(PENDING)
+  user             User             @relation(fields: [userId], references: [id], onDelete: Cascade)
+  requiredDate     AttendanceRequiredDate @relation(fields: [requiredDateId], references: [id], onDelete: Cascade)
+  updatedAt        DateTime         @updatedAt
+
+  @@unique([userId, requiredDateId])
+}
+
+model ReminderConfig {
+  id             String   @id @default(cuid())
+  userId         String   @unique
+  frequency      String   @default("daily")
+  customCron     String?
+  enabled        Boolean  @default(true)
+  user           User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  updatedAt      DateTime @updatedAt
+}
+
+model Notification {
+  id          String           @id @default(cuid())
+  userId      String
+  type        NotificationType
+  title       String
+  message     String
+  isRead      Boolean          @default(false)
+  user        User             @relation(fields: [userId], references: [id], onDelete: Cascade)
+  createdAt   DateTime         @default(now())
+}
+
+model ActivityLog {
+  id          String   @id @default(cuid())
+  userId      String
+  action      String
+  metadata    String?
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  createdAt   DateTime @default(now())
+}
+
+model Account {
+  id                String  @id @default(cuid())
+  userId            String
+  type              String
+  provider          String
+  providerAccountId String
+  refresh_token     String?
+  access_token      String?
+  expires_at        Int?
+  token_type        String?
+  scope             String?
+  id_token          String?
+  session_state     String?
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([provider, providerAccountId])
+}
+
+model Session {
+  id           String   @id @default(cuid())
+  sessionToken String   @unique
+  userId       String
+  expires      DateTime
+  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model VerificationToken {
+  identifier String
+  token      String   @unique
+  expires    DateTime
+
+  @@unique([identifier, token])
+}
